@@ -210,6 +210,7 @@ module Phonelib
       # even when no new regex is added (add_additional_regex does it too),
       # otherwise stale capture groups desync the national number offset
       @@phone_data = @@data_by_country_codes = nil
+      @@phone_regexp_cache.clear
       data.each do |row|
         next if row.size != 3
         add_additional_regex(*row)
@@ -220,6 +221,7 @@ module Phonelib
       return unless Phonelib::Core::TYPES_DESC.key?(type.to_sym)
       return unless national_regex.is_a?(String)
       @@phone_data = @@data_by_country_codes = nil
+      @@phone_regexp_cache.clear
       @@additional_regexes[country.to_s.upcase] ||= {}
       @@additional_regexes[country.to_s.upcase][type] ||= []
       @@additional_regexes[country.to_s.upcase][type] << national_regex
