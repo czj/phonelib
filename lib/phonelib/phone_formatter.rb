@@ -11,7 +11,7 @@ module Phonelib
       format_match, format_string = formatting_data
 
       if format_match
-        out = format_string.gsub(/\$\d/) { |el| format_match[el[1].to_i] }
+        out = expand_format(format_string, format_match)
         formatted ? out : out.delete('^0-9')
       else
         @national_number
@@ -61,7 +61,7 @@ module Phonelib
       national = @national_number
       if (matches = @national_number.match(cr(fmt[Core::PATTERN])))
         fmt = fmt[:intl_format] || fmt[:format]
-        national = fmt.gsub(/\$\d/) { |el| matches[el[1].to_i] } unless fmt == 'NA'
+        national = expand_format(fmt, matches) unless fmt == 'NA'
       end
 
       "#{prefix}#{data_country_code} #{national}"
@@ -148,25 +148,47 @@ module Phonelib
     def formatting_data
       return @formatting_data if defined?(@formatting_data)
 
-      data = country_data
-      format = data[:format]
-      prefix = data[Core::NATIONAL_PREFIX]
-      rule = format[Core::NATIONAL_PREFIX_RULE] ||
-             data[Core::NATIONAL_PREFIX_RULE] || '$1'
-
-      # change rule's constants to values
-      rule = rule.gsub(/(\$NP|\$FG)/, '$NP' => prefix, '$FG' => '$1')
-
-      # add space to format groups, change first group to rule,
-      format_string = format[:format].gsub(/(\d)\$/, '\\1 $')
-      if format_string.include? '$1'
-	format_string.gsub! '$1', rule
-      else
-	format_string = rule.gsub('$1', '') + format_string
-      end
-
+      format = country_data[:format]
       @formatting_data =
-          [@national_number.match(cr(format[Core::PATTERN])), format_string]
+          [@national_number.match(cr(format[Core::PATTERN])), national_format_string(format)]
+    end
+
+    # @private national format string of a country format, built once per
+    # format and country since it only depends on the country data
+    def national_format_string(format)
+      by_country = Phonelib.phone_regexp_cache[:national_format_string] ||= {}.compare_by_identity
+      by_country = by_country[format] ||= {}
+      by_country[country] ||= begin
+        data = country_data
+        prefix = data[Core::NATIONAL_PREFIX]
+        rule = format[Core::NATIONAL_PREFIX_RULE] ||
+               data[Core::NATIONAL_PREFIX_RULE] || '$1'
+
+        # change rule's constants to values
+        rule = rule.gsub(/(\$NP|\$FG)/, '$NP' => prefix, '$FG' => '$1')
+
+        # add space to format groups, change first group to rule,
+        format_string = format[:format].gsub(/(\d)\$/, '\\1 $')
+        if format_string.include? '$1'
+          format_string.gsub! '$1', rule
+        else
+          format_string = rule.gsub('$1', '') + format_string
+        end
+        format_string.freeze
+      end
+    end
+
+    # @private replaces $1 to $9 in a format string with the match groups,
+    # the format string being split once into literals and group indexes
+    def expand_format(format_string, match)
+      parts_by_format = Phonelib.phone_regexp_cache[:format_parts] ||= {}.compare_by_identity
+      parts = parts_by_format[format_string] ||= format_string.split(/(\$\d)/).reject(&:empty?).map do |part|
+        part.match?(/\A\$\d\z/) ? part[1].to_i : part.freeze
+      end.freeze
+
+      parts.each_with_object(+'') do |part, out|
+        out << (part.is_a?(Integer) ? match[part].to_s : part)
+      end
     end
   end
 end
