@@ -4,3 +4,4 @@ gemspec path: ".."
 
 gem "rspec", RUBY_VERSION > "3.1.0" ? ">= 3" : "2.14.1"
 gem "simplecov"
+gem "nokogiri", RUBY_VERSION > "3.0.0" ? "~> 1.16" : (RUBY_VERSION > "2.7.0" ? "~> 1.15" : "~> 1.10")
