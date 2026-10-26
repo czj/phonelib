@@ -215,7 +215,9 @@ module Phonelib
               else
                 cr("[#{Phonelib.extension_separate_symbols}]")
               end
-      split = (original || '').split regex
+      return [original.dup, ''] unless original.match?(regex)
+
+      split = original.split regex
       [split.first || '', split[1..-1] && split[1..-1].join || '']
     end
 
